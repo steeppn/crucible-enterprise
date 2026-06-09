@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("crucible.agents")
 
 class BaseAgent:
-    """Base class for all CRUCIBLE agents. Handles model routing, grounding, and reasoning traces."""
+    """Base class for all CRUCIBLE agents. Handles model routing, IQ layer integration, and reasoning traces."""
 
     MODEL_PRIMARY = os.getenv("AZURE_AI_PRIMARY_MODEL_DEPLOYMENT", "crucible-examiner")
     MODEL_REASONING = os.getenv("AZURE_AI_REASONING_MODEL_DEPLOYMENT", "crucible-reasoning")
@@ -22,6 +22,10 @@ class BaseAgent:
         self.model_type = model_type
         self.reasoning_trace = []
         self.client = None
+        self._foundry_iq = None
+        self._work_iq = None
+        self._fabric_iq = None
+        self._mcp_client = None
 
     def _get_api_version(self, model_name: str) -> str:
         if "o4" in model_name or "o3" in model_name:
@@ -97,6 +101,131 @@ class BaseAgent:
             "content": content[:200] + "..." if len(content) > 200 else content,
             "timestamp": datetime.utcnow().isoformat()
         }
+
+    # ── IQ Layer Helpers ──────────────────────────────────────────────
+
+    def _get_foundry_iq(self):
+        """Lazy-load Foundry IQ client."""
+        if self._foundry_iq is None:
+            from services.foundry_iq import FoundryIQClient
+            self._foundry_iq = FoundryIQClient()
+        return self._foundry_iq
+
+    def _get_work_iq(self):
+        """Lazy-load Work IQ client."""
+        if self._work_iq is None:
+            from services.work_iq import WorkIQClient
+            self._work_iq = WorkIQClient()
+        return self._work_iq
+
+    def _get_fabric_iq(self):
+        """Lazy-load Fabric IQ client."""
+        if self._fabric_iq is None:
+            from services.fabric_iq import FabricIQClient
+            self._fabric_iq = FabricIQClient()
+        return self._fabric_iq
+
+    def _get_mcp_client(self):
+        """Lazy-load MCP client."""
+        if self._mcp_client is None:
+            from services.mcp_client import MCPClient
+            self._mcp_client = MCPClient()
+        return self._mcp_client
+
+    def _retrieve_knowledge(self, query: str, cert_id: str = None, top_k: int = 5) -> list:
+        """Retrieve grounded knowledge from Foundry IQ."""
+        foundry = self._get_foundry_iq()
+        results = foundry.query(query, cert_id=cert_id, top_k=top_k)
+        self._log_step("foundry_iq_retrieval", f"Query: {query[:60]}... Results: {len(results)}")
+        return results
+
+    def _retrieve_mcp_docs(self, query: str, top_k: int = 5) -> list:
+        """Search Microsoft Learn documentation via MCP."""
+        mcp = self._get_mcp_client()
+        results = mcp.search_docs(query, top_k=top_k)
+        self._log_step("mcp_search", f"Query: {query[:60]}... Results: {len(results)}")
+        return results
+
+    def _get_employee_signals(self, employee_id: str) -> dict:
+        """Get work context signals from Work IQ."""
+        work_iq = self._get_work_iq()
+        signals = work_iq.get_employee_signals(employee_id)
+        self._log_step("work_iq_signals", f"Employee: {employee_id}, Workload: {signals.get('workload_level', 'unknown')}")
+        return signals
+
+    def _get_available_slots(self, employee_id: str, hours_needed: int = 2) -> list:
+        """Get available study slots from Work IQ."""
+        work_iq = self._get_work_iq()
+        slots = work_iq.get_available_slots(employee_id, hours_needed=hours_needed)
+        self._log_step("work_iq_slots", f"Employee: {employee_id}, Available slots: {len(slots)}")
+        return slots
+
+    def _get_cert_details(self, cert_id: str) -> dict:
+        """Get certification details from Fabric IQ ontology."""
+        fabric = self._get_fabric_iq()
+        details = fabric.get_cert_details(cert_id)
+        self._log_step("fabric_iq_cert", f"Cert: {cert_id}, Found: {details is not None}")
+        return details
+
+    def _get_role_mapping(self, role: str) -> dict:
+        """Get role-to-cert mapping from Fabric IQ ontology."""
+        fabric = self._get_fabric_iq()
+        mapping = fabric.get_role_cert_mapping(role)
+        self._log_step("fabric_iq_role", f"Role: {role}, Primary: {mapping.get('primary_cert')}")
+        return mapping
+
+    def _get_skill_overlap(self, cert_a: str, cert_b: str) -> dict:
+        """Get skill overlap analysis from Fabric IQ."""
+        fabric = self._get_fabric_iq()
+        overlap = fabric.get_skill_overlap(cert_a, cert_b)
+        self._log_step("fabric_iq_overlap", f"{cert_a} vs {cert_b}: {overlap.get('overlap_pct', 0)}% overlap")
+        return overlap
+
+    def _get_learner_readiness(self, learner_id: str) -> dict:
+        """Get learner readiness from Fabric IQ analytics."""
+        fabric = self._get_fabric_iq()
+        readiness = fabric.get_learner_readiness(learner_id)
+        self._log_step("fabric_iq_readiness", f"Learner: {learner_id}, Score: {readiness.get('readiness_score', 0)}")
+        return readiness
+
+    def _get_team_analytics(self, cert_id: str = None) -> dict:
+        """Get team analytics from Fabric IQ."""
+        fabric = self._get_fabric_iq()
+        analytics = fabric.get_team_analytics(cert_id=cert_id)
+        self._log_step("fabric_iq_analytics", f"Cert: {cert_id or 'all'}, Learners: {analytics.get('total_learners', 0)}")
+        return analytics
+
+    def _recommend_next_cert(self, role: str, completed_certs: list) -> list:
+        """Get certification recommendations from Fabric IQ."""
+        fabric = self._get_fabric_iq()
+        recs = fabric.recommend_next_cert(role, completed_certs)
+        self._log_step("fabric_iq_recommend", f"Role: {role}, Recommendations: {len(recs)}")
+        return recs
+
+    def _format_retrieval_context(self, results: list, source: str = "Foundry IQ") -> str:
+        """Format retrieval results into context text for model prompts."""
+        if not results:
+            return f"No {source} results found."
+        
+        context_parts = []
+        for i, r in enumerate(results, 1):
+            title = r.get("title", "Unknown")
+            content = r.get("content", "")[:500]
+            section = r.get("section", "")
+            skill = r.get("skill_domain", "")
+            score = r.get("reranker_score", 0)
+            
+            part = f"[{i}] {title}"
+            if section:
+                part += f" (Section: {section})"
+            if skill:
+                part += f" [Skill: {skill}]"
+            if score:
+                part += f" (Relevance: {score:.2f})"
+            part += f"\n{content}"
+            context_parts.append(part)
+        
+        return f"{source} Retrieved Content:\n" + "\n\n---\n\n".join(context_parts)
 
     def get_reasoning_trace(self) -> list:
         return self.reasoning_trace

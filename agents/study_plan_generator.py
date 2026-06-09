@@ -4,14 +4,15 @@ from .base_agent import BaseAgent
 
 SYSTEM_PROMPT = """You are the Study Plan Generator in CRUCIBLE Enterprise.
 
-Your role: Convert a learning brief from the Learning Path Curator into a practical, milestone-based study schedule. You account for the employee's workload, available focus windows, and certification prerequisites.
+Your role: Convert a learning brief from the Learning Path Curator into a practical, milestone-based study schedule. You account for the employee's workload (Work IQ), certification prerequisites and skill relationships (Fabric IQ), and available focus windows.
 
 BEHAVIOUR RULES:
 - Break the certification into logical study milestones (one per skill domain)
 - Allocate study hours based on the certification's recommended hours and the employee's availability
 - Sequence milestones based on prerequisites and difficulty progression
 - Include assessment checkpoints after each milestone
-- Account for the employee's meeting load and focus hours
+- Account for the employee's meeting load and focus hours from Work IQ
+- Use Fabric IQ ontology to understand skill dependencies and overlap
 - Produce a realistic schedule — don't overload any single week
 
 OUTPUT FORMAT:
@@ -45,37 +46,50 @@ class StudyPlanGenerator(BaseAgent):
 
     def __init__(self):
         super().__init__(agent_name="StudyPlanGenerator", model_type="reasoning")
-        self.synthetic_data = self._load_synthetic_data()
-
-    def _load_synthetic_data(self) -> dict:
-        data = {}
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-        for filename in os.listdir(data_dir):
-            if filename.endswith(".json"):
-                key = filename.replace(".json", "")
-                with open(os.path.join(data_dir, filename), "r", encoding="utf-8") as f:
-                    data[key] = json.load(f)
-        return data
 
     def generate_plan(self, learning_brief: dict, employee_id: str = None) -> dict:
         self._log_step("generate_plan", f"Creating study plan for cert={learning_brief.get('certification', 'unknown')}")
 
-        work_signals = self.synthetic_data.get("work_activity_signals", [])
-        employee_signal = None
-        if employee_id:
-            for signal in work_signals:
-                if signal.get("employee_id") == employee_id:
-                    employee_signal = signal
-                    break
+        work_signals = self._get_employee_signals(employee_id) if employee_id else {
+            "meeting_hours_per_week": 15,
+            "focus_hours_per_week": 15,
+            "preferred_learning_slot": "Afternoon",
+            "workload_level": "moderate"
+        }
 
-        if not employee_signal and work_signals:
-            employee_signal = work_signals[0]
+        available_slots = self._get_available_slots(employee_id, hours_needed=2) if employee_id else []
+
+        cert_id = learning_brief.get("certification", "")
+        cert_details = self._get_cert_details(cert_id)
+        prerequisites = self._get_fabric_iq().get_cert_prerequisites(cert_id) if cert_details else []
+
+        skill_overlap = {}
+        if cert_details and len(cert_details.get("skills", [])) > 1:
+            first_skill = cert_details["skills"][0]
+            for skill in cert_details["skills"][1:]:
+                certs_a = self._get_fabric_iq().get_certs_by_skill(first_skill)
+                certs_b = self._get_fabric_iq().get_certs_by_skill(skill)
+                shared = set(certs_a) & set(certs_b)
+                if shared:
+                    skill_overlap[f"{first_skill} ↔ {skill}"] = list(shared)
 
         user_prompt = f"""LEARNING BRIEF:
 {json.dumps(learning_brief, indent=2)}
 
-EMPLOYEE WORK SIGNALS:
-{json.dumps(employee_signal, indent=2) if employee_signal else "No work signals available — assume 15 meeting hours/week, 15 focus hours/week, preferred slot: Afternoon"}
+EMPLOYEE WORK SIGNALS (Work IQ):
+{json.dumps(work_signals, indent=2)}
+
+AVAILABLE STUDY SLOTS (Work IQ):
+{json.dumps(available_slots[:5], indent=2) if available_slots else "No slots queried"}
+
+CERTIFICATION DETAILS (Fabric IQ):
+{json.dumps(cert_details, indent=2) if cert_details else "Not found in ontology"}
+
+PREREQUISITE CHAIN (Fabric IQ):
+{json.dumps(prerequisites, indent=2)}
+
+SKILL OVERLAP ANALYSIS (Fabric IQ):
+{json.dumps(skill_overlap, indent=2) if skill_overlap else "No significant overlap detected"}
 
 Generate a practical study plan that:
 1. Breaks the certification into milestones (one per skill domain)
@@ -83,6 +97,7 @@ Generate a practical study plan that:
 3. Sequences milestones logically (prerequisites first)
 4. Includes assessment checkpoints
 5. Produces a realistic weekly schedule
+6. Accounts for meeting load and focus windows
 
 Return the JSON as specified in your system prompt."""
 

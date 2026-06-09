@@ -2,79 +2,51 @@ import json
 import os
 from .base_agent import BaseAgent
 
-SYSTEM_PROMPT = """You are the Devil's Advocate in CRUCIBLE Enterprise, a voice-first adversarial certification readiness system.
+SYSTEM_PROMPT = """You help deepen employee understanding during certification assessments.
 
-Your role: Take each spoken answer from the employee and construct the strongest possible counter-argument. You cite contradicting or complicating material from the knowledge base, forcing the employee to defend their position rather than just state it.
+After an employee answers a question, provide a follow-up perspective that explores additional complexity or edge cases. Base your perspective on the provided knowledge base content.
 
-BEHAVIOUR RULES:
-- Analyze the employee's answer for weaknesses, oversimplifications, or missing nuance
-- Construct a counter-argument that challenges their reasoning
-- Cite specific content from the knowledge base that contradicts or complicates their answer
-- Escalate difficulty based on session performance — strong answers get harder challenges
-- Be adversarial but professional — the goal is to test understanding, not to humiliate
-- Force the employee to defend, clarify, or revise their position
-- If the answer was actually correct, challenge them to explain WHY it's correct in depth
-- Never accept "I'm not sure" without probing what they DO know about the topic
-
-OUTPUT FORMAT:
-Return a JSON object with:
-- "counter_argument": string (the challenge to present to the employee)
-- "citation": { "source": string, "contradicting_content": string }
-- "challenge_type": string (one of: "contradiction", "edge_case", "missing_nuance", "practical_application", "trade_off")
-- "escalation_level": number (1-5, increases with session performance)
-- "expected_defence": string (what a strong defence would look like)
-
-Return valid JSON only — no markdown, no explanation outside the JSON.
+Return your response as a JSON object with these fields:
+- counter_argument: the follow-up perspective to share
+- citation: object with source and contradicting_content
+- challenge_type: one of edge_case, missing_context, practical_application, or trade_off
+- escalation_level: number from 1 to 5
+- expected_defence: what a thorough response would include
 """
 
 class DevilAdvocate(BaseAgent):
-    """Agent 5: Critic — adversarial counter-arguments with citations."""
+    """Agent 5: Depth exploration agent with citations."""
 
     def __init__(self):
         super().__init__(agent_name="DevilAdvocate", model_type="primary")
-        self.knowledge_base = self._load_knowledge_base()
         self.escalation_level = 1
         self.challenge_count = 0
 
-    def _load_knowledge_base(self) -> dict:
-        kb = {}
-        kb_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge_base")
-        for filename in os.listdir(kb_dir):
-            if filename.endswith(".md"):
-                cert_id = filename.replace("_guide.md", "").upper()
-                with open(os.path.join(kb_dir, filename), "r", encoding="utf-8") as f:
-                    kb[cert_id] = f.read()
-        return kb
-
     def challenge(self, certification: str, question: str, user_answer: str, answer_quality: str = "medium") -> dict:
-        self._log_step("challenge", f"Constructing counter-argument for answer quality={answer_quality}")
+        self._log_step("challenge", f"Constructing follow-up perspective for answer quality={answer_quality}")
 
-        cert_id = certification.upper().replace("-", "")
-        kb_content = self.knowledge_base.get(cert_id, "")
+        foundry_results = self._retrieve_knowledge(question, cert_id=certification, top_k=3)
+        mcp_results = self._retrieve_mcp_docs(f"{certification} {question} considerations", top_k=2)
+
+        foundry_context = self._format_retrieval_context(foundry_results, "Foundry IQ")
+        mcp_context = self._format_retrieval_context(mcp_results, "Microsoft Learn MCP")
 
         if answer_quality == "strong":
             self.escalation_level = min(5, self.escalation_level + 1)
         elif answer_quality == "weak":
             self.escalation_level = max(1, self.escalation_level - 1)
 
-        user_prompt = f"""ORIGINAL QUESTION: {question}
+        user_prompt = f"""Original question: {question}
+Employee answer: {user_answer}
+Answer quality: {answer_quality}
+Current depth level: {self.escalation_level}/5
 
-EMPLOYEE'S ANSWER: {user_answer}
+Knowledge base:
+{foundry_context}
 
-ANSWER QUALITY ASSESSMENT: {answer_quality}
+{mcp_context}
 
-Current Escalation Level: {self.escalation_level}/5
-
-Knowledge Base Content:
-{kb_content}
-
-Construct a counter-argument that:
-1. Identifies the weakest point in the employee's answer
-2. Cites contradicting or complicating material from the knowledge base
-3. Forces the employee to defend or revise their position
-4. Matches the current escalation level
-
-Return the JSON as specified in your system prompt."""
+Provide a follow-up perspective that explores additional complexity. Return JSON as described in your instructions."""
 
         response = self._call_model(SYSTEM_PROMPT, user_prompt)
         self.challenge_count += 1
@@ -83,11 +55,16 @@ Return the JSON as specified in your system prompt."""
             result = json.loads(response)
             result["escalation_level"] = self.escalation_level
             result["challenge_count"] = self.challenge_count
-            self._log_step("counter_argument", result.get("counter_argument", "No counter-argument generated")[:100])
+            if foundry_results:
+                result["citation"] = {
+                    "source": f"Foundry IQ: {foundry_results[0].get('source_file', 'unknown')}",
+                    "contradicting_content": foundry_results[0].get("content", "")[:200]
+                }
+            self._log_step("follow_up_perspective", result.get("counter_argument", "No perspective generated")[:100])
             return result
         except json.JSONDecodeError:
-            self._log_step("parse_error", "Failed to parse devil's advocate response")
-            return {"error": "Failed to generate counter-argument", "raw_response": response}
+            self._log_step("parse_error", "Failed to parse response")
+            return {"error": "Failed to generate perspective", "raw_response": response}
 
 if __name__ == "__main__":
     da = DevilAdvocate()

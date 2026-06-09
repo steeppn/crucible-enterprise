@@ -67,5 +67,65 @@
       "primary_cert": "AZ-104",
       "secondary_cert": "AZ-900"
     }
+  ],
+  "skill_relationships": [
+    {
+      "skill_a": "Virtual Networking",
+      "skill_b": "Hybrid Networking",
+      "relationship": "extends",
+      "strength": 0.8
+    },
+    {
+      "skill_a": "Identity & Governance",
+      "skill_b": "Azure Security",
+      "relationship": "overlaps",
+      "strength": 0.6
+    },
+    {
+      "skill_a": "Azure Compute",
+      "skill_b": "Compute",
+      "relationship": "equivalent",
+      "strength": 0.9
+    },
+    {
+      "skill_a": "Azure Storage",
+      "skill_b": "Storage",
+      "relationship": "equivalent",
+      "strength": 0.9
+    },
+    {
+      "skill_a": "Monitoring",
+      "skill_b": "Continuous Feedback",
+      "relationship": "supports",
+      "strength": 0.5
+    },
+    {
+      "skill_a": "CI/CD Pipelines",
+      "skill_b": "Infrastructure",
+      "relationship": "depends_on",
+      "strength": 0.7
+    }
+  ],
+  "progression_paths": [
+    {
+      "path_name": "Cloud Administration Track",
+      "sequence": ["AZ-900", "AZ-104", "AZ-305"],
+      "target_roles": ["Cloud Engineer", "System Administrator"]
+    },
+    {
+      "path_name": "Developer Track",
+      "sequence": ["AZ-900", "AZ-204", "AZ-400"],
+      "target_roles": ["Software Developer", "DevOps Engineer"]
+    },
+    {
+      "path_name": "Networking Track",
+      "sequence": ["AZ-900", "AZ-104", "AZ-700"],
+      "target_roles": ["Network Engineer"]
+    },
+    {
+      "path_name": "DevOps Expert Track",
+      "sequence": ["AZ-900", "AZ-104", "AZ-204", "AZ-400"],
+      "target_roles": ["DevOps Engineer"]
+    }
   ]
 }

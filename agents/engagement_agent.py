@@ -4,16 +4,17 @@ from .base_agent import BaseAgent
 
 SYSTEM_PROMPT = """You are the Engagement Agent in CRUCIBLE Enterprise.
 
-Your role: Keep learners progressing by adapting study reminders and session recommendations to their actual work rhythm. You draw on work context signals to avoid scheduling study sessions during peak meeting periods.
+Your role: Keep learners progressing by adapting study reminders and session recommendations to their actual work rhythm. You draw on Work IQ signals to avoid scheduling study sessions during peak meeting periods and to personalize engagement based on individual work patterns.
 
 BEHAVIOUR RULES:
-- Analyze the employee's meeting load and focus hours
+- Analyze the employee's meeting load and focus hours from Work IQ
 - Recommend study windows that align with their preferred learning slot
-- Avoid suggesting study during high-meeting periods (>15 hrs/week)
+- Avoid suggesting study during high-meeting periods (>20 hrs/week)
 - Prioritize focus-heavy time blocks
 - Keep recommendations supportive, not demanding
 - Adapt reminder timing to their work patterns
 - If the employee is behind schedule, suggest a catch-up plan without being punitive
+- Consider stress indicators when setting engagement tone
 
 OUTPUT FORMAT:
 Return a JSON object with:
@@ -42,35 +43,24 @@ class EngagementAgent(BaseAgent):
 
     def __init__(self):
         super().__init__(agent_name="EngagementAgent", model_type="primary")
-        self.synthetic_data = self._load_synthetic_data()
-
-    def _load_synthetic_data(self) -> dict:
-        data = {}
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-        for filename in os.listdir(data_dir):
-            if filename.endswith(".json"):
-                key = filename.replace(".json", "")
-                with open(os.path.join(data_dir, filename), "r", encoding="utf-8") as f:
-                    data[key] = json.load(f)
-        return data
 
     def generate_engagement(self, employee_id: str, study_plan: dict, progress: dict = None) -> dict:
         self._log_step("generate_engagement", f"Creating engagement plan for employee={employee_id}")
 
-        work_signals = self.synthetic_data.get("work_activity_signals", [])
-        employee_signal = None
-        for signal in work_signals:
-            if signal.get("employee_id") == employee_id:
-                employee_signal = signal
-                break
-
-        if not employee_signal and work_signals:
-            employee_signal = work_signals[0]
+        work_signals = self._get_employee_signals(employee_id)
+        available_slots = self._get_available_slots(employee_id, hours_needed=2)
+        work_pattern = self._get_work_iq().get_work_pattern_summary(employee_id)
 
         progress_info = json.dumps(progress) if progress else "No progress data available — assume starting fresh"
 
-        user_prompt = f"""EMPLOYEE WORK SIGNALS:
-{json.dumps(employee_signal, indent=2)}
+        user_prompt = f"""EMPLOYEE WORK SIGNALS (Work IQ):
+{json.dumps(work_signals, indent=2)}
+
+AVAILABLE STUDY SLOTS (Work IQ):
+{json.dumps(available_slots[:5], indent=2)}
+
+WORK PATTERN SUMMARY (Work IQ):
+{json.dumps(work_pattern, indent=2)}
 
 STUDY PLAN:
 {json.dumps(study_plan, indent=2)}
@@ -83,6 +73,7 @@ Generate an engagement plan that:
 2. Sets a reminder schedule that respects their meeting load
 3. Assesses their capacity for this week
 4. Provides supportive recommendations
+5. Accounts for stress indicators and workload level
 
 Return the JSON as specified in your system prompt."""
 

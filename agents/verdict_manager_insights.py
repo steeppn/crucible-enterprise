@@ -4,7 +4,7 @@ from .base_agent import BaseAgent
 
 SYSTEM_PROMPT = """You are the Verdict and Manager Insights Agent in CRUCIBLE Enterprise.
 
-Your role: Synthesize the full session transcript and reasoning traces to produce an individual readiness report and aggregated manager insights.
+Your role: Synthesize the full session transcript and reasoning traces to produce an individual readiness report and aggregated manager insights. You use Fabric IQ for semantic analytics over learner data and Work IQ for team capacity signals.
 
 INDIVIDUAL REPORT:
 Analyze the full session and produce:
@@ -24,13 +24,13 @@ Analyze the full session and produce:
 - "session_summary": string (2-3 sentence summary of performance)
 
 MANAGER INSIGHTS (aggregated, no individual PII):
-Produce team-level insights:
+Produce team-level insights using Fabric IQ analytics and Work IQ capacity signals:
 - "team_readiness_by_cert": {
     "cert_id": { "avg_readiness": number, "employee_count": number, "risk_level": string }
   }
 - "risk_flags": [
     { "cert_id": string, "risk_type": string, "description": string, "affected_count": number }
-  ]
+  }
 - "completion_patterns": {
     "avg_study_hours": number,
     "pass_rate": number,
@@ -51,19 +51,8 @@ class VerdictManagerInsights(BaseAgent):
 
     def __init__(self):
         super().__init__(agent_name="VerdictManagerInsights", model_type="reasoning")
-        self.synthetic_data = self._load_synthetic_data()
 
-    def _load_synthetic_data(self) -> dict:
-        data = {}
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-        for filename in os.listdir(data_dir):
-            if filename.endswith(".json"):
-                key = filename.replace(".json", "")
-                with open(os.path.join(data_dir, filename), "r", encoding="utf-8") as f:
-                    data[key] = json.load(f)
-        return data
-
-    def generate_report(self, session_transcript: list, self_rated_confidence: int, certification: str) -> dict:
+    def generate_report(self, session_transcript: list, self_rated_confidence: int, certification: str, employee_id: str = None) -> dict:
         self._log_step("generate_report", f"Synthesizing report for cert={certification}, self_rated={self_rated_confidence}")
 
         transcript_text = "\n".join([
@@ -71,8 +60,21 @@ class VerdictManagerInsights(BaseAgent):
             for e in session_transcript
         ])
 
-        learner_data = self.synthetic_data.get("learner_performance", [])
-        cert_data = self.synthetic_data.get("certification_semantic_model", {})
+        learner_readiness = self._get_learner_readiness(employee_id) if employee_id else {
+            "readiness_score": 0,
+            "status": "no_data",
+            "recommendation": "No learner data available"
+        }
+
+        team_analytics = self._get_team_analytics(certification)
+        work_capacity = self._get_work_iq().get_team_capacity([employee_id]) if employee_id else {
+            "team_size": 0,
+            "avg_meeting_hours": 0,
+            "avg_focus_hours": 0,
+            "capacity_level": "unknown"
+        }
+
+        cert_details = self._get_cert_details(certification)
 
         user_prompt = f"""SESSION TRANSCRIPT:
 {transcript_text}
@@ -80,11 +82,17 @@ class VerdictManagerInsights(BaseAgent):
 EMPLOYEE'S SELF-RATED CONFIDENCE: {self_rated_confidence}/100
 TARGET CERTIFICATION: {certification}
 
-SYNTHETIC LEARNER DATA (for manager insights):
-{json.dumps(learner_data, indent=2)}
+LEARNER READINESS (Fabric IQ):
+{json.dumps(learner_readiness, indent=2)}
 
-CERTIFICATION SEMANTIC MODEL:
-{json.dumps(cert_data, indent=2)}
+TEAM ANALYTICS (Fabric IQ):
+{json.dumps(team_analytics, indent=2)}
+
+TEAM CAPACITY (Work IQ):
+{json.dumps(work_capacity, indent=2)}
+
+CERTIFICATION DETAILS (Fabric IQ):
+{json.dumps(cert_details, indent=2) if cert_details else "Not found in ontology"}
 
 Generate the individual readiness report and manager insights as specified in your system prompt.
 
@@ -114,9 +122,9 @@ if __name__ == "__main__":
     verdict = VerdictManagerInsights()
     mock_transcript = [
         {"role": "examiner", "content": "What is the difference between availability sets and availability zones?"},
-        {"role": "employee", "content": "Availability sets protect against hardware failures within a datacenter, while availability zones protect across datacenters in the same region."},
+        {"role": "employee", "content": "Availability sets protect against hardware failures within a datacenter, while availability zones protect across datacenters."},
         {"role": "examiner", "content": "Good. Now explain how many availability zones a typical Azure region has and what happens if one zone goes down."},
         {"role": "employee", "content": "I think most regions have 3 zones. If one goes down, the others keep running. But I'm not sure about the exact SLA."},
     ]
-    report = verdict.generate_report(mock_transcript, 70, "AZ-104")
+    report = verdict.generate_report(mock_transcript, 70, "AZ-104", "L-1001")
     print(json.dumps(report, indent=2))

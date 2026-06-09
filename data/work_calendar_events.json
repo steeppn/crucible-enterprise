@@ -1,0 +1,138 @@
+[
+  {
+    "employee_id": "EMP-001",
+    "date": "2026-06-15",
+    "start": "09:00",
+    "end": "10:00",
+    "title": "Sprint Planning",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-001",
+    "date": "2026-06-15",
+    "start": "14:00",
+    "end": "15:00",
+    "title": "Architecture Review",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-001",
+    "date": "2026-06-16",
+    "start": "10:00",
+    "end": "11:00",
+    "title": "1:1 with Manager",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-002",
+    "date": "2026-06-15",
+    "start": "11:00",
+    "end": "12:00",
+    "title": "Team Standup",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-002",
+    "date": "2026-06-16",
+    "start": "09:00",
+    "end": "10:30",
+    "title": "Design Workshop",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-003",
+    "date": "2026-06-15",
+    "start": "13:00",
+    "end": "14:00",
+    "title": "Code Review Session",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-004",
+    "date": "2026-06-15",
+    "start": "09:00",
+    "end": "10:00",
+    "title": "Leadership Sync",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-004",
+    "date": "2026-06-15",
+    "start": "11:00",
+    "end": "12:00",
+    "title": "Budget Review",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-004",
+    "date": "2026-06-15",
+    "start": "14:00",
+    "end": "15:30",
+    "title": "Stakeholder Update",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-004",
+    "date": "2026-06-16",
+    "start": "09:00",
+    "end": "10:00",
+    "title": "Leadership Sync",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-005",
+    "date": "2026-06-15",
+    "start": "10:00",
+    "end": "11:00",
+    "title": "Sprint Retro",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-006",
+    "date": "2026-06-15",
+    "start": "09:00",
+    "end": "09:30",
+    "title": "Daily Standup",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-006",
+    "date": "2026-06-16",
+    "start": "14:00",
+    "end": "15:00",
+    "title": "Network Planning",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-007",
+    "date": "2026-06-15",
+    "start": "11:00",
+    "end": "12:00",
+    "title": "DevOps Sync",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-008",
+    "date": "2026-06-15",
+    "start": "09:00",
+    "end": "10:30",
+    "title": "All Hands",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-008",
+    "date": "2026-06-15",
+    "start": "13:00",
+    "end": "14:00",
+    "title": "Vendor Review",
+    "type": "meeting"
+  },
+  {
+    "employee_id": "EMP-008",
+    "date": "2026-06-16",
+    "start": "10:00",
+    "end": "11:30",
+    "title": "Strategy Session",
+    "type": "meeting"
+  }
+]

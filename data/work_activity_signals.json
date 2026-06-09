@@ -34,5 +34,17 @@
     "meeting_hours_per_week": 18,
     "focus_hours_per_week": 14,
     "preferred_learning_slot": "Morning"
+  },
+  {
+    "employee_id": "EMP-007",
+    "meeting_hours_per_week": 10,
+    "focus_hours_per_week": 22,
+    "preferred_learning_slot": "Afternoon"
+  },
+  {
+    "employee_id": "EMP-008",
+    "meeting_hours_per_week": 25,
+    "focus_hours_per_week": 8,
+    "preferred_learning_slot": "Evening"
   }
 ]

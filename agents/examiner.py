@@ -2,41 +2,25 @@ import json
 import os
 from .base_agent import BaseAgent
 
-SYSTEM_PROMPT = """You are the Examiner in CRUCIBLE Enterprise, a voice-first adversarial certification readiness system.
+SYSTEM_PROMPT = """You help assess employee readiness for Microsoft certification exams.
 
-Your role: Conduct a spoken interrogation session to assess an employee's readiness for their target certification. You ask grounded questions cited from the organisation's knowledge base, listen to spoken answers, and adapt follow-up questions in real time.
+Ask one question at a time about the certification topic. Base your questions on the provided knowledge base content. After receiving an answer, ask a follow-up question that explores the topic further.
 
-BEHAVIOUR RULES:
-- Open each session by acknowledging the employee's calibration (topic + confidence level)
-- Ask ONE question at a time — wait for the employee's answer before proceeding
-- Every question MUST be grounded in the knowledge base content provided
-- Cite the specific skill domain or exam objective your question relates to
-- Do NOT accept vague or surface-level answers — probe deeper with follow-ups
-- If an answer is weak, ask a more specific follow-up on the same topic
-- If an answer is strong, escalate to a harder question on a related topic
-- Adapt difficulty based on answer quality (track internally)
-- Be professional but firm — this is an adversarial examination, not a friendly quiz
-- Never give away the answer in your question
+Return your response as a JSON object with these fields:
+- question: the question to ask
+- citation: object with source, skill_domain, and content_snippet
+- difficulty_level: number from 1 to 5
+- follow_up_strategy: one of explore, advance, maintain, shift_focus, or opening
+- session_state: object with questions_asked, answers_received, and current_score
 
-OUTPUT FORMAT:
-Return a JSON object with:
-- "question": string (the question to ask the employee)
-- "citation": { "source": string, "skill_domain": string, "content_snippet": string }
-- "difficulty_level": number (1-5, where 1 is basic recall, 5 is complex synthesis)
-- "follow_up_strategy": string (one of: "probe_deeper", "escalate", "maintain", "redirect")
-- "session_state": { "questions_asked": number, "answers_received": number, "current_score": number }
-
-If this is the opening question (no prior answers), set follow_up_strategy to "opening".
-
-Return valid JSON only — no markdown, no explanation outside the JSON.
+For the first question, set follow_up_strategy to opening.
 """
 
 class Examiner(BaseAgent):
-    """Agent 4: Adversarial Assessor — voice-first grounded questioning."""
+    """Agent 4: Assessment Agent for certification readiness."""
 
     def __init__(self):
         super().__init__(agent_name="Examiner", model_type="primary")
-        self.knowledge_base = self._load_knowledge_base()
         self.session_state = {
             "questions_asked": 0,
             "answers_received": 0,
@@ -45,40 +29,27 @@ class Examiner(BaseAgent):
             "conversation_history": []
         }
 
-    def _load_knowledge_base(self) -> dict:
-        kb = {}
-        kb_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge_base")
-        for filename in os.listdir(kb_dir):
-            if filename.endswith(".md"):
-                cert_id = filename.replace("_guide.md", "").upper()
-                with open(os.path.join(kb_dir, filename), "r", encoding="utf-8") as f:
-                    kb[cert_id] = f.read()
-        return kb
-
     def open_session(self, role: str, certification: str, confidence_level: str) -> dict:
         self._log_step("session_open", f"Role={role}, Cert={certification}, Confidence={confidence_level}")
 
-        cert_id = certification.upper().replace("-", "")
-        if cert_id not in self.knowledge_base:
-            return {"error": f"Certification {certification} not found in knowledge base"}
+        foundry_results = self._retrieve_knowledge(certification, cert_id=certification, top_k=5)
+        mcp_results = self._retrieve_mcp_docs(f"{certification} exam objectives", top_k=3)
 
-        kb_content = self.knowledge_base[cert_id]
+        foundry_context = self._format_retrieval_context(foundry_results, "Foundry IQ")
+        mcp_context = self._format_retrieval_context(mcp_results, "Microsoft Learn MCP")
 
-        user_prompt = f"""This is the OPENING question for a new session.
+        user_prompt = f"""Generate an opening question for this employee:
 
-Employee Role: {role}
-Target Certification: {certification}
-Employee's Self-Rated Confidence: {confidence_level}
+Role: {role}
+Certification: {certification}
+Confidence: {confidence_level}
 
-Knowledge Base Content:
-{kb_content}
+Knowledge base content:
+{foundry_context}
 
-Generate an opening question that:
-1. Acknowledges their confidence level
-2. Asks a grounded question from the knowledge base
-3. Sets the tone for an adversarial examination
+{mcp_context}
 
-Return the JSON as specified in your system prompt."""
+Return JSON as described in your instructions."""
 
         response = self._call_model(SYSTEM_PROMPT, user_prompt)
         self.session_state["questions_asked"] += 1
@@ -86,6 +57,12 @@ Return the JSON as specified in your system prompt."""
         try:
             result = json.loads(response)
             result["session_state"] = self.session_state
+            if foundry_results:
+                result["citation"] = {
+                    "source": f"Foundry IQ: {foundry_results[0].get('source_file', 'unknown')}",
+                    "skill_domain": foundry_results[0].get("skill_domain", "General"),
+                    "content_snippet": foundry_results[0].get("content", "")[:200]
+                }
             self._log_step("opening_question", result.get("question", "No question generated"))
             return result
         except json.JSONDecodeError:
@@ -95,26 +72,24 @@ Return the JSON as specified in your system prompt."""
     def ask_follow_up(self, role: str, certification: str, user_answer: str, previous_question: str) -> dict:
         self._log_step("follow_up", f"Processing answer to: {previous_question[:80]}...")
 
-        cert_id = certification.upper().replace("-", "")
-        kb_content = self.knowledge_base.get(cert_id, "")
+        foundry_results = self._retrieve_knowledge(previous_question, cert_id=certification, top_k=3)
+        foundry_context = self._format_retrieval_context(foundry_results, "Foundry IQ")
 
         history_summary = "\n".join([
             f"Q: {h['question']}\nA: {h['answer']}"
             for h in self.session_state["conversation_history"][-4:]
         ])
 
-        user_prompt = f"""PREVIOUS QUESTION: {previous_question}
+        user_prompt = f"""Previous question: {previous_question}
+Employee answer: {user_answer}
 
-EMPLOYEE'S ANSWER: {user_answer}
-
-CONVERSATION HISTORY (last 4 exchanges):
+Conversation history:
 {history_summary}
 
-Knowledge Base Content:
-{kb_content}
+Knowledge base:
+{foundry_context}
 
-Evaluate the answer and generate the next question.
-Return the JSON as specified in your system prompt."""
+Generate a follow-up question. Return JSON as described in your instructions."""
 
         response = self._call_model(SYSTEM_PROMPT, user_prompt)
         self.session_state["questions_asked"] += 1
@@ -127,6 +102,12 @@ Return the JSON as specified in your system prompt."""
         try:
             result = json.loads(response)
             result["session_state"] = self.session_state
+            if foundry_results:
+                result["citation"] = {
+                    "source": f"Foundry IQ: {foundry_results[0].get('source_file', 'unknown')}",
+                    "skill_domain": foundry_results[0].get("skill_domain", "General"),
+                    "content_snippet": foundry_results[0].get("content", "")[:200]
+                }
             self._log_step("follow_up_question", result.get("question", "No question generated"))
             return result
         except json.JSONDecodeError:

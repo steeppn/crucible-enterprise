@@ -6,7 +6,7 @@ SYSTEM_PROMPT = """You are the Learning Path Curator in CRUCIBLE Enterprise, a c
 
 Your role: Map an employee's role and target certification to relevant skills and approved learning resources.
 
-You are grounded in the organisation's knowledge base. You must cite source material — never provide unsupported free-text recommendations.
+You are grounded in the organisation's knowledge base (Foundry IQ) and can supplement with Microsoft Learn documentation (MCP). You must cite source material — never provide unsupported free-text recommendations.
 
 Given:
 - Employee role (e.g., Cloud Engineer, Network Engineer, DevOps Engineer)
@@ -37,36 +37,31 @@ class LearningPathCurator(BaseAgent):
 
     def __init__(self):
         super().__init__(agent_name="LearningPathCurator", model_type="primary")
-        self.knowledge_base = self._load_knowledge_base()
-
-    def _load_knowledge_base(self) -> dict:
-        kb = {}
-        kb_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge_base")
-        for filename in os.listdir(kb_dir):
-            if filename.endswith(".md"):
-                cert_id = filename.replace("_guide.md", "").upper()
-                with open(os.path.join(kb_dir, filename), "r", encoding="utf-8") as f:
-                    kb[cert_id] = f.read()
-        return kb
 
     def generate_learning_brief(self, role: str, certification: str) -> dict:
         self._log_step("start", f"Generating learning brief for role={role}, cert={certification}")
 
-        cert_id = certification.upper().replace("-", "")
-        if cert_id not in self.knowledge_base:
-            self._log_step("error", f"Certification {certification} not found in knowledge base")
-            return {
-                "error": f"Certification {certification} not found in knowledge base",
-                "available_certs": list(self.knowledge_base.keys())
-            }
+        foundry_results = self._retrieve_knowledge(certification, cert_id=certification, top_k=3)
+        mcp_results = self._retrieve_mcp_docs(f"{certification} Microsoft certification objectives", top_k=3)
 
-        kb_content = self.knowledge_base[cert_id]
+        foundry_context = self._format_retrieval_context(foundry_results, "Foundry IQ")
+        mcp_context = self._format_retrieval_context(mcp_results, "Microsoft Learn MCP")
+
+        role_mapping = self._get_role_mapping(role)
+        cert_details = self._get_cert_details(certification)
 
         user_prompt = f"""Role: {role}
 Target Certification: {certification}
 
-Knowledge Base Content for {certification}:
-{kb_content}
+ROLE-TO-CERT MAPPING (Fabric IQ):
+{json.dumps(role_mapping, indent=2)}
+
+CERTIFICATION DETAILS (Fabric IQ):
+{json.dumps(cert_details, indent=2) if cert_details else "Not found in ontology"}
+
+{foundry_context}
+
+{mcp_context}
 
 Generate the learning brief as specified in your system prompt."""
 
@@ -74,9 +69,19 @@ Generate the learning brief as specified in your system prompt."""
 
         try:
             result = json.loads(response)
-            result["citations"] = [
-                self._format_citation(f"{certification}_guide.md", kb_content[:500])
-            ]
+            citations = []
+            for r in foundry_results:
+                citations.append(self._format_citation(
+                    f"Foundry IQ: {r.get('source_file', 'unknown')}",
+                    r.get("content", "")[:200]
+                ))
+            for r in mcp_results:
+                if r.get("url"):
+                    citations.append(self._format_citation(
+                        f"Microsoft Learn MCP: {r.get('title', 'unknown')}",
+                        r.get("summary", r.get("content", ""))[:200]
+                    ))
+            result["citations"] = citations
             self._log_step("complete", f"Learning brief generated with {len(result.get('learning_brief', {}).get('skill_domains', []))} skill domains")
             return result
         except json.JSONDecodeError:
