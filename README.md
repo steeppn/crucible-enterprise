@@ -8,11 +8,11 @@
 
 ## What Is It
 
-CRUCIBLE Enterprise is a multi-agent certification readiness system that puts employees through a live spoken interrogation grounded in approved organisational knowledge. Instead of self-reported confidence scores or practice quizzes, CRUCIBLE uses six specialised agents to question, challenge, and pressure-test understanding — then produces individual readiness reports and team-level manager insights.
+CRUCIBLE Enterprise is a multi-agent certification readiness system that puts employees through a live spoken interrogation grounded in approved organisational knowledge. Instead of self-reported confidence scores or practice quizzes, CRUCIBLE uses six specialised agents to question, challenge, and pressure-test understanding, then produces individual readiness reports and team-level manager insights.
 
 ## The Problem
 
-Enterprise certification programmes rely on passive assessment signals. Employees can recognise correct answers without understanding the underlying concept. CRUCIBLE replaces this with **grounded spoken interrogation** — agents ask cited questions from the knowledge base, adapt difficulty based on answer quality, and produce structured readiness analytics.
+Enterprise certification programmes rely on passive assessment signals. Employees can recognise correct answers without understanding the underlying concept. CRUCIBLE replaces this with **grounded spoken interrogation** agents ask cited questions from the knowledge base, adapt difficulty based on answer quality, and produce structured readiness analytics.
 
 ## Architecture
 
