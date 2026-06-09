@@ -21,16 +21,21 @@ class BaseAgent:
         self.agent_name = agent_name
         self.model_type = model_type
         self.reasoning_trace = []
-        self.client = self._create_client()
+        self.client = None
 
-    def _create_client(self) -> AzureOpenAI:
-        endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+    def _get_api_version(self, model_name: str) -> str:
+        if "o4" in model_name or "o3" in model_name:
+            return "2024-12-01-preview"
+        return "2024-06-01"
+
+    def _create_client(self, api_version: str = None) -> AzureOpenAI:
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         if not endpoint:
-            raise ValueError("AZURE_AI_PROJECT_ENDPOINT not set in environment")
+            raise ValueError("AZURE_OPENAI_ENDPOINT not set in environment")
         return AzureOpenAI(
             azure_endpoint=endpoint,
-            api_version="2024-05-01-preview",
-            api_key=os.getenv("AZURE_AI_API_KEY", "dummy-key-for-foundry")
+            api_version=api_version or "2024-06-01",
+            api_key=os.getenv("AZURE_AI_API_KEY")
         )
 
     def _get_model_name(self) -> str:
@@ -50,20 +55,37 @@ class BaseAgent:
 
     def _call_model(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> str:
         model = self._get_model_name()
-        self._log_step("model_call", f"Using model: {model}")
+        api_version = self._get_api_version(model)
+        self._log_step("model_call", f"Using model: {model}, api_version: {api_version}")
+
+        client = self._create_client(api_version=api_version)
+
+        is_reasoning_model = "o4" in model or "o3" in model
+        params = {
+            "model": model,
+        }
+        if is_reasoning_model:
+            params["messages"] = [
+                {"role": "user", "content": f"Instructions: {system_prompt}\n\nTask: {user_prompt}"}
+            ]
+            params["max_completion_tokens"] = 4000
+        else:
+            params["messages"] = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+            params["temperature"] = temperature
+            params["max_tokens"] = 4000
 
         try:
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=temperature,
-                max_tokens=2000
-            )
-            result = response.choices[0].message.content
+            response = client.chat.completions.create(**params)
+            msg = response.choices[0].message
+            result = msg.content or ""
+            if not result and hasattr(msg, 'reasoning') and msg.reasoning:
+                result = msg.reasoning
             self._log_step("model_response", f"Received {len(result)} chars")
+            if not result:
+                self._log_step("model_warning", "Empty response from model")
             return result
         except Exception as e:
             self._log_step("model_error", str(e))
