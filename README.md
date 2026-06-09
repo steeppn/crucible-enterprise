@@ -4,7 +4,7 @@
 > Reasoning Agents Track | Microsoft Foundry Hackathon
 > Built by Steph & Era
 
-**Tagline:** *"You don't know it until you can defend it."*
+*"You don't know it until you can defend it."*
 
 ## What Is It
 
