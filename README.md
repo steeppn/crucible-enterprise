@@ -147,8 +147,8 @@ crucible-enterprise/
 
 ## Team
 
-- **Steph** — Technical Lead
-- **Era** — Creative Lead
+- **Stephen Alegros** - Technical Lead
+- **Era Yesha Reyes** - Creative Lead
 
 ## License
 
