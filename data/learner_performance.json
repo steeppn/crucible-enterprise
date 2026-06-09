@@ -1,0 +1,66 @@
+[
+  {
+    "learner_id": "L-1001",
+    "role": "Cloud Engineer",
+    "certification": "AZ-900",
+    "practice_score_avg": 67,
+    "hours_studied": 18,
+    "exam_outcome": "Fail"
+  },
+  {
+    "learner_id": "L-1002",
+    "role": "Network Engineer",
+    "certification": "AZ-700",
+    "practice_score_avg": 82,
+    "hours_studied": 24,
+    "exam_outcome": "Pass"
+  },
+  {
+    "learner_id": "L-1003",
+    "role": "DevOps Engineer",
+    "certification": "AZ-400",
+    "practice_score_avg": 74,
+    "hours_studied": 20,
+    "exam_outcome": "Pass"
+  },
+  {
+    "learner_id": "L-1004",
+    "role": "Software Developer",
+    "certification": "AZ-204",
+    "practice_score_avg": 58,
+    "hours_studied": 12,
+    "exam_outcome": "Fail"
+  },
+  {
+    "learner_id": "L-1005",
+    "role": "System Administrator",
+    "certification": "AZ-104",
+    "practice_score_avg": 88,
+    "hours_studied": 32,
+    "exam_outcome": "Pass"
+  },
+  {
+    "learner_id": "L-1006",
+    "role": "Cloud Engineer",
+    "certification": "AZ-204",
+    "practice_score_avg": 71,
+    "hours_studied": 22,
+    "exam_outcome": "Pass"
+  },
+  {
+    "learner_id": "L-1007",
+    "role": "Network Engineer",
+    "certification": "AZ-700",
+    "practice_score_avg": 63,
+    "hours_studied": 15,
+    "exam_outcome": "Fail"
+  },
+  {
+    "learner_id": "L-1008",
+    "role": "DevOps Engineer",
+    "certification": "AZ-400",
+    "practice_score_avg": 79,
+    "hours_studied": 28,
+    "exam_outcome": "Pass"
+  }
+]

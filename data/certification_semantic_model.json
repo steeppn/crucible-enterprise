@@ -1,0 +1,71 @@
+{
+  "certifications": [
+    {
+      "id": "AZ-900",
+      "name": "Microsoft Azure Fundamentals",
+      "skills": ["Cloud Concepts", "Azure Architecture", "Azure Management", "Security & Compliance"],
+      "recommended_hours": 20,
+      "prerequisites": [],
+      "difficulty": "Fundamentals"
+    },
+    {
+      "id": "AZ-104",
+      "name": "Microsoft Azure Administrator",
+      "skills": ["Identity & Governance", "Storage", "Compute", "Virtual Networking", "Monitoring"],
+      "recommended_hours": 40,
+      "prerequisites": ["AZ-900"],
+      "difficulty": "Associate"
+    },
+    {
+      "id": "AZ-204",
+      "name": "Developing Solutions for Microsoft Azure",
+      "skills": ["Azure Compute", "Azure Storage", "Azure Security", "Monitoring", "API Integration"],
+      "recommended_hours": 45,
+      "prerequisites": ["AZ-900"],
+      "difficulty": "Associate"
+    },
+    {
+      "id": "AZ-400",
+      "name": "Designing and Implementing Microsoft DevOps Solutions",
+      "skills": ["DevOps Processes", "Source Control", "CI/CD Pipelines", "Dependency Management", "Infrastructure", "Continuous Feedback"],
+      "recommended_hours": 50,
+      "prerequisites": ["AZ-104", "AZ-204"],
+      "difficulty": "Expert"
+    },
+    {
+      "id": "AZ-700",
+      "name": "Designing and Implementing Microsoft Azure Networking Solutions",
+      "skills": ["Hybrid Networking", "Virtual Networks", "Load Balancing", "Network Security", "Private Access"],
+      "recommended_hours": 40,
+      "prerequisites": ["AZ-104"],
+      "difficulty": "Associate"
+    }
+  ],
+  "roles": [
+    {
+      "role": "Cloud Engineer",
+      "primary_cert": "AZ-104",
+      "secondary_cert": "AZ-204"
+    },
+    {
+      "role": "Network Engineer",
+      "primary_cert": "AZ-700",
+      "secondary_cert": "AZ-104"
+    },
+    {
+      "role": "DevOps Engineer",
+      "primary_cert": "AZ-400",
+      "secondary_cert": "AZ-104"
+    },
+    {
+      "role": "Software Developer",
+      "primary_cert": "AZ-204",
+      "secondary_cert": "AZ-900"
+    },
+    {
+      "role": "System Administrator",
+      "primary_cert": "AZ-104",
+      "secondary_cert": "AZ-900"
+    }
+  ]
+}
