@@ -93,11 +93,36 @@ All agents access IQ layers through helper methods in `base_agent.py`:
    AZURE_AI_REASONING_MODEL_DEPLOYMENT=o4-mini
    AZURE_SEARCH_ENDPOINT=https://your-search.search.windows.net
    AZURE_SEARCH_API_KEY=your-search-key
+   VOICE_LIVE_STT_ENDPOINT=wss://your-voice-live-endpoint/stt
+   VOICE_LIVE_TTS_ENDPOINT=wss://your-voice-live-endpoint/tts
+   VOICE_LIVE_API_KEY=your-voice-key
    ```
-7. **Run an agent:**
+7. **Start the API server:**
+   ```bash
+   python -m api.main
+   ```
+   Server runs at http://localhost:8000
+
+8. **Run an agent directly:**
    ```bash
    python -m agents.learning_path_curator
    ```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `POST` | `/session/start` | Start a new assessment session |
+| `WS` | `/session/stream/{id}` | WebSocket for real-time session streaming |
+| `POST` | `/session/answer` | Submit an answer to an active session |
+| `GET` | `/session/report/{id}` | Get full session report with verdict |
+| `GET` | `/session/{id}` | Get session status |
+| `POST` | `/learning-brief` | Generate a learning brief for a role + cert |
+| `POST` | `/study-plan` | Generate a study plan |
+| `GET` | `/engagement/{id}` | Get engagement signals for an employee |
+| `GET` | `/dashboard` | Get team dashboard with evaluation metrics |
+| `GET` | `/dashboard/cert/{id}` | Get certification-specific dashboard |
 
 ## Tech Stack
 
@@ -121,28 +146,34 @@ All data in this project is clearly fabricated. No real names, emails, or PII ar
 
 ```
 crucible-enterprise/
-├── agents/              # Six specialised agent classes
+├── agents/              # Six specialised agent classes + orchestrator
 │   ├── base_agent.py    # Model routing + IQ layer helpers
+│   ├── orchestrator.py  # Session loop: Examiner → Devil's Advocate → Verdict
 │   ├── learning_path_curator.py
 │   ├── study_plan_generator.py
 │   ├── engagement_agent.py
 │   ├── examiner.py
 │   ├── devil_advocate.py
 │   └── verdict_manager_insights.py
-├── services/            # IQ layer integrations
-│   ├── foundry_iq.py
-│   ├── mcp_client.py
-│   ├── work_iq.py
-│   └── fabric_iq.py
+├── services/            # IQ layer integrations + evaluation
+│   ├── foundry_iq.py    # Azure AI Search client
+│   ├── mcp_client.py    # Microsoft Learn MCP client
+│   ├── work_iq.py       # Simulated Graph API
+│   ├── fabric_iq.py     # Simulated ontology engine
+│   └── evaluation.py    # Foundry-style groundedness/relevance/coherence scoring
+├── api/                 # FastAPI backend
+│   └── main.py          # REST + WebSocket endpoints
+├── voice/               # Voice pipeline
+│   └── voice_live_client.py  # STT/TTS WebSocket client
 ├── data/                # Synthetic datasets
 │   ├── learner_performance.json
 │   ├── work_activity_signals.json
 │   ├── work_calendar_events.json
 │   └── certification_semantic_model.json
 ├── knowledge_base/      # Synthetic certification guides
-├── api/                 # FastAPI backend (pending)
-├── voice/               # Voice pipeline (pending)
-└── frontend/            # UI (pending)
+├── docs/                # Documentation
+│   └── era-frontend-guide.md  # Frontend build guide
+└── frontend/            # UI (in progress)
 ```
 
 ## Team
