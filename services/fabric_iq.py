@@ -395,6 +395,18 @@ class FabricIQClient:
 
     # ── Ontology Summary ──────────────────────────────────────────────
 
+    def get_all_learners(self) -> list:
+        """Get all learners from the synthetic dataset."""
+        return [
+            {
+                "id": l.get("learner_id", "Unknown"),
+                "role": l.get("role", "Unknown"),
+                "target_cert": l.get("certification", "N/A"),
+                "last_session": l.get("last_session_date", "N/A")
+            }
+            for l in self._learner_data
+        ]
+
     def get_ontology_summary(self) -> dict:
         """Get a summary of the ontology structure."""
         return {
